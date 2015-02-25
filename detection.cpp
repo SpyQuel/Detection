@@ -73,6 +73,7 @@ double alpha = 0.1f;
 int frame_number;
 int num_bg_frames;
 int num_blobs;
+FILE * file;
 
 int main(int argc, char** argv) {
 
@@ -81,7 +82,7 @@ int main(int argc, char** argv) {
 	double new_val;
 	double * mod_val = NULL;
 	bool modify = false;
-	printf("***********Detection***********\n");
+	printf("***********Change Detection***********\n");
 	filename = "../data/video_proj.avi";
 	
 	while(choice!='g') { 
@@ -319,14 +320,8 @@ void elab() {
 	//con un kernel 2x6 ci sono alcuni punti casuali ma ovviamente la persona e gli oggetti sono piu definiti
 	IplConvKernel * kernel_round = cvCreateStructuringElementEx(3,6,2,3,CV_SHAPE_ELLIPSE);
 
-	
-
 	cvErode(background_diff,background_diff,kernel_round,1);
 	cvDilate(background_diff,background_diff,kernel_round,1);
-
-	//provo a "riempire" di piu la persona aumentando i punti sgaffi
-	//cvDilate(background_diff,background_diff,kernel_round,8);
-	//cvErode(background_diff,background_diff,kernel_round,8);
 
 	//Visualize
 	cvResizeWindow(winBGDiff,background_diff->width,background_diff->height);
@@ -346,10 +341,10 @@ void find_blobs() {
 		//final output
 		winOut = "Change Detection";
 		cvNamedWindow(winOut, 0);
-	}
 
-	//cvDilate(frame_blobs,frame_blobs,NULL,10);
-	//cvErode(frame_blobs,frame_blobs,NULL,10);
+		//file
+		file = fopen("C:/Users/John/Desktop/output.txt", "w");
+	}
 
 	IplConvKernel * kernel = cvCreateStructuringElementEx(21,31,11,16,CV_SHAPE_ELLIPSE);
 
@@ -461,8 +456,35 @@ void find_blobs() {
 		}
 	}
 
-	//elaborazione dati dei blob e salvataggio su file
+	int actual_blob_num = 0;
+	int blob_counter = 0;
+	int max_area = 0;
+	int max_area_index = -1;
+	int min_area = 250;
 
+	for(i=0;i<num_blobs;i++) {
+		if(b_feats[i].area >= min_area) {
+			actual_blob_num++;
+			strcpy(b_feats[i].type, "object");
+			if(b_feats[i].area > max_area) {
+				max_area = b_feats[i].area;
+				max_area_index = i;
+			}
+		}
+	}
+	if(max_area_index >= 0) {
+		strcpy(b_feats[max_area_index].type, "person");
+	}
+
+	//filtro con area > 250!
+	//elaborazione dati dei blob e salvataggio su file
+	fprintf(file, "frame number: %d \t number of objects: %d\n", frame_number, actual_blob_num);
+	for(i=0;i<num_blobs;i++) {
+		if(b_feats[i].area >= min_area) {
+			fprintf(file, "%d \t area: %5d \t perimeter: %4d \t ID : %s\n", ++blob_counter, b_feats[i].area, (int) (b_feats[i].perimeter8 + b_feats[i].perimeter4)/2, b_feats[i].type); 
+		}
+	}
+	fprintf(file, "\n");
 
 	cvResizeWindow(winOut,output->width,output->height);
 	cvShowImage(winOut, output);
@@ -483,6 +505,8 @@ void release() {
 		cvReleaseImage(&frame_diff2);
 		cvReleaseImage(&background_diff);
 		cvReleaseImage(&change_mask);
+		cvReleaseImage(&output);
+		cvReleaseImage(&frame_blobs);
 		
 		cvDestroyWindow(winOut);
 		cvDestroyWindow(winBG);
@@ -492,6 +516,8 @@ void release() {
 
 		free(histograms);
 		free(colors);
+
+		fclose(file);
 }
 
 int open_avi() {
